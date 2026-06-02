@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>好吃餐車 – 付款原型</title>
+<style>
+  :root {
+    --green: #5ab946;
+    --green-dark: #3d8c2e;
+    --green-light: #eaf7e6;
+    --green-border: #b8e0b0;
+    --gray-bg: #f4f5f7;
+    --white: #ffffff;
+    --text: #333333;
+    --text-sub: #666666;
+    --text-light: #999999;
+    --border: #d9d9d9;
+    --red: #d32f2f;
+    --blue: #1976d2;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    background: #292929;
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ===== PAGE 1 - QR Code ===== */
+  #page1.active {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a6b10 0%, #3aaa2a 50%, #5dd64a 100%);
+  }
+  .qr-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 40px 50px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-width: 340px;
+    width: 90%;
+    position: relative;
+  }
+  .qr-card::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: -3px; right: -3px; bottom: -3px;
+    background: linear-gradient(135deg, #5ab946, #a8e08a, #5ab946);
+    border-radius: 22px;
+    z-index: -1;
+  }
+  .qr-store-name {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--green-dark);
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+  }
+  .qr-store-icon { font-size: 32px; margin-bottom: 12px; }
+  .qr-box {
+    background: var(--white);
+    border: 3px solid var(--green);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 20px 0;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .qr-box:hover { transform: scale(1.02); box-shadow: 0 8px 24px rgba(90,185,70,0.3); }
+  .qr-box:active { transform: scale(0.98); }
+  .qr-box canvas { display: block; margin: 0 auto; }
+  .qr-scan-hint { font-size: 12px; color: var(--text-light); margin-top: -8px; margin-bottom: 16px; }
+  .qr-table-badge {
+    background: var(--green);
+    color: white;
+    font-size: 22px;
+    font-weight: 700;
+    padding: 10px 32px;
+    border-radius: 999px;
+    letter-spacing: 2px;
+    display: inline-block;
+  }
+  .tap-hint { margin-top: 20px; font-size: 13px; color: var(--text-light); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+  /* ===== SHARED ECPAY LAYOUT ===== */
+  .ecpay-wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    background: var(--white);
+    min-height: 100vh;
+    box-shadow: var(--shadow);
+  }
+  .ecpay-header {
+    background: var(--green);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ecpay-header .logo-text { color: white; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; }
+  .ecpay-header .ecpay-logo-small {
+    background: white; color: var(--green-dark);
+    font-size: 11px; font-weight: 800;
+    padding: 3px 8px; border-radius: 4px; letter-spacing: 1px;
+  }
+  .pay-tab-title {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    color: white; text-align: center;
+    padding: 18px 20px 16px;
+    font-size: 18px; font-weight: 700; letter-spacing: 2px;
+  }
+  .pay-tab-title .sub { font-size: 12px; font-weight: 400; opacity: 0.8; }
+
+  /* ===== PAGE 2 FORM ===== */
+  .p2-content { padding: 24px 20px; }
+  .form-row { margin-bottom: 20px; }
+  .form-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+  .form-label .req { color: var(--red); margin-right: 4px; }
+  .form-label .en { font-size: 12px; color: var(--text-light); font-weight: 400; margin-left: 6px; }
+  .form-input {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 15px; font-family: inherit; color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s; outline: none; background: var(--white);
+  }
+  .form-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(90,185,70,0.12); }
+  .form-input[readonly] { background: #f8f8f8; color: var(--text-sub); }
+  .product-display {
+    padding: 11px 14px; background: var(--gray-bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 15px; color: var(--text-sub);
+  }
+  .notice-box {
+    background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: var(--radius); padding: 14px 16px; margin-top: 20px;
+  }
+  .notice-box h4 { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 8px; }
+  .notice-box ul { padding-left: 16px; }
+  .notice-box li { font-size: 12px; color: #78350f; line-height: 1.6; margin-bottom: 4px; }
+  .notice-box .tex_col { color: var(--red); font-weight: 600; }
+  .btn-primary {
+    width: 100%; padding: 14px; background: var(--green); color: white;
+    border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: 2px; margin-top: 8px;
+    transition: background 0.15s, transform 0.05s; font-family: inherit;
+  }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-primary:active { transform: scale(0.98); }
+  .mp-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 16px; border-top: 1px solid var(--border); margin-top: 20px; }
+  .back-btn {
+    background: none; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 20px; font-size: 14px; cursor: pointer; color: var(--text-sub);
+    font-family: inherit; transition: background 0.15s; margin-bottom: 16px;
+  }
+  .back-btn:hover { background: var(--gray-bg); }
+
+  /* ===== PAGE 3 ===== */
+  .section-block { border-top: 8px solid var(--gray-bg); padding: 20px 20px 4px; }
+  .section-title { font-size: 15px; font-weight: 700; color: var(--text); padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .section-title .en { font-size: 12px; color: var(--text-light); font-weight: 400; display: block; margin-top: 2px; }
+  .order-table { width: 100%; border-collapse: collapse; }
+  .order-table th, .order-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .order-table th { color: var(--text-sub); font-weight: 600; text-align: left; width: 35%; }
+  .order-table td { color: var(--text); text-align: right; }
+  .amount-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .amount-table th { background: var(--gray-bg); padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--text-sub); }
+  .amount-table th:last-child, .amount-table td:last-child { text-align: right; }
+  .amount-table td { padding: 8px 12px; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .currency-note { font-size: 12px; color: var(--text-light); margin: 8px 0; }
+  .checkbox-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; font-size: 13px; color: var(--text-sub); }
+  .checkbox-row input { width: 15px; height: 15px; margin-top: 2px; accent-color: var(--green); flex-shrink: 0; cursor: pointer; }
+  .checkbox-row a { color: var(--blue); text-decoration: underline; cursor: pointer; }
+
+  /* Invoice section */
+  .invoice-section { background: #f0faf0; border: 1px solid var(--green-border); border-radius: 8px; padding: 16px; margin-bottom: 4px; }
+  .radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; padding: 4px 0; }
+  .radio-label input[type="radio"] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
+  .conditional-field { display: none; margin-top: 10px; padding: 12px; background: white; border-radius: 6px; border: 1px dashed var(--border); animation: slideDown 0.2s ease; }
+  .conditional-field.show { display: block; }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+  .donate-toggle { display: flex; gap: 20px; flex-wrap: wrap; }
+
+  /* ===== PAGE 4 - AIO (faithfully reproduced from ECPay) ===== */
+  #page4 .site-body {
+    width: 100%;
+    background: white;
+    font-family: 微軟正黑體, Tahoma, 新細明體, "Arial Unicode MS", Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    color: #222;
+  }
+  /* Order info box */
+  #page4 .site-content-wrapper { width: 100%; position: relative; background: white; }
+  #page4 .site-content-wrapper.scw-gray { background: #f3f3f3; box-shadow: #e0e0e0 0 0 4px 1px inset; }
+  #page4 .site-content { width: 100%; max-width: 640px; margin: 0 auto; position: relative; padding: 25px 15px; }
+  #page4 .order-info-box { width: 100%; padding: 0 15px; }
+  #page4 .oib-title { width: 100%; padding: 8px 18px 8px 8px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: bold; color: #444; line-height: 1.4; }
+  #page4 .oib-detail { width: 100%; }
+  #page4 .obd-box { width: 100%; border-top: 1px solid #e0e0e0; }
+  #page4 .obd-box dl { width: 100%; padding: 8px; font-size: 14px; color: #444; line-height: 1.4; display: flex; align-items: baseline; }
+  #page4 .obd-box dt { width: 80px; flex-shrink: 0; color: #666; font-weight: 600; }
+  #page4 .obd-box dd { flex: 1; text-align: right; }
+  #page4 .obd-table { width: 100%; border-top: 1px solid #e0e0e0; }
+  #page4 .obd-table table { width: 100%; border-collapse: collapse; }
+  #page4 .obd-table th { padding: 8px; border-top: 1px solid #e0e0e0; background: #f5f5f5; font-size: 13px; font-weight: bold; color: #666; }
+  #page4 .obd-table th.otb-l { text-align: left; }
+  #page4 .obd-table th.otb-r { text-align: right; }
+  #page4 .obd-table td { padding: 8px; font-size: 14px; border-bottom: 1px solid #e0e0e0; }
+  #page4 .obd-table td.otb-r { text-align: right; }
+  #page4 .oib-sum { width: 100%; padding: 8px 8px 8px 8px; display: flex; align-items: center; justify-content: flex-end; font-size: 16px; font-weight: bold; color: #444; line-height: 1.4; border-top: 1px solid #e0e0e0; }
+  #page4 .obs-title { font-size: 14px; }
+  #page4 .obs-price { margin-left: 16px; font-size: 18px; color: #3d8c2e; }
+
+  /* Payment method tabs */
+  #page4 .member-pay { width: 100%; }
+  #page4 .content-title { width: 100%; text-align: center; font-size: 20px; font-weight: bold; line-height: 1.3; margin-bottom: 30px; color: #222; padding-top: 10px; }
+  #page4 .pay-tab-wrapper { width: 100%; }
+  #page4 .pay-tab-menu { width: 100%; position: relative; }
+  #page4 .pay-tab-list { width: 100%; height: auto; text-align: center; padding-bottom: 8px; border-bottom: 2px solid #666; display: flex; align-items: stretch; justify-content: flex-start; flex-wrap: wrap; padding: 0 0 8px 0; margin: 0; list-style: none; }
+  #page4 .pay-tab-list li { min-height: 36px; padding: 6px 12px; margin: 0 8px 8px 0; text-align: left; color: #444; font-size: 14px; font-weight: bold; line-height: 1.5; background: white; cursor: pointer; border: 1px solid #e0e0e0; border-radius: 4px; display: flex; align-items: center; transition: 0.2s; }
+  #page4 .pay-tab-list li.active { background: #5ab946; color: white; border-color: #5ab946; }
+  #page4 .ptl-ic { width: 22px; height: 22px; background: center center / contain no-repeat; margin-right: 6px; flex-shrink: 0; }
+  #page4 .pay-tab-content { width: 100%; padding-top: 16px; }
+  #page4 .pay-tab0, #page4 .pay-tab8, #page4 .pay-tab11 { display: none; }
+  #page4 .pay-tab0.show, #page4 .pay-tab8.show, #page4 .pay-tab11.show { display: block; }
+  #page4 .pay-tab-form { width: 100%; }
+  #page4 .pay-tab-form h4.scw-focus { font-size: 16px; font-weight: bold; margin: 10px 0 16px; color: #444; }
+  #page4 .ptf-card-type { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  #page4 .cc-icon { display: inline-block; width: 48px; height: 30px; background: center/contain no-repeat; border: 1px solid #e0e0e0; border-radius: 4px; background-color: #f5f5f5; font-size: 10px; text-align: center; line-height: 30px; color: #666; font-weight: bold; }
+  #page4 .ptf-bs {}
+  #page4 .pay-tab-form dl { display: flex; align-items: baseline; padding: 0 0 12px 0; font-size: 14px; color: #444; flex-wrap: wrap; }
+  #page4 .pay-tab-form dl dt { width: 140px; flex-shrink: 0; line-height: 1.4; padding-right: 10px; }
+  #page4 .pay-tab-form dl dd { flex: 1; min-width: 180px; }
+  #page4 .pay-tab-form dl sup.inp-required { color: #f85766; font-size: 12px; margin-left: 2px; }
+  #page4 .pay-tab-form select { font-family: inherit; border: 1px solid #e0e0e0; padding: 7px 8px; font-size: 14px; cursor: pointer; background: white; border-radius: 4px; width: 100%; }
+  #page4 .pay-tab-form input[type="tel"],
+  #page4 .pay-tab-form input[type="text"],
+  #page4 .pay-tab-form input[type="email"] {
+    font-family: inherit; border: 1px solid #e0e0e0; padding: 7px 8px; font-size: 14px; color: #222; background: white; border-radius: 4px; transition: 0.2s;
+  }
+  #page4 .pay-tab-form input:focus,
+  #page4 .pay-tab-form input:hover { background: #fffde9; outline: none; }
+  #page4 .pay-tab-form .pay-tab-select { display: block; }
+  /* Card number row – stack inputs in a tight flex row */
+  #page4 .pay-card-num { width: 100%; list-style: none; padding: 0; margin: 0; }
+  #page4 .pay-card-num li.card-num { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+  #page4 .pay-card-num li.card-num input[type="tel"] { width: 54px; min-width: 0; text-align: center; flex-shrink: 1; }
+  /* Expiry + CVV: each is its own full-width dl row */
+  #page4 .pay-card-date { flex-wrap: wrap; align-items: flex-start; }
+  #page4 .pay-card-date > dd:first-of-type { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; }
+  #page4 .pay-card-date > dd:first-of-type > div { display: flex; align-items: center; gap: 8px; }
+  #page4 .pay-card-date > dd:first-of-type input[type="tel"] { width: 64px; text-align: center; }
+  /* CVV moved out to its own independent dl */
+  #page4 .pay-card-ccvb { width: 100%; margin-top: 0; }
+  #page4 .pay-card-ccvb dl { display: flex; align-items: baseline; padding: 0 0 12px 0; flex-wrap: wrap; }
+  #page4 .pay-card-ccvb dl dt { width: 140px; flex-shrink: 0; padding-right: 10px; line-height: 1.4; }
+  #page4 .pay-card-ccvb dl dd { display: flex; align-items: center; gap: 8px; }
+  #page4 .pay-card-ccvb input[type="tel"] { width: 80px; text-align: center; }
+  #page4 .p-ccvb-img { width: 36px; vertical-align: middle; }
+  #page4 .pay-tab-check { margin: 16px 0; }
+  #page4 .pay-tab-check h4.scw-focus { display: inline-block; margin: 0 12px 0 0; font-size: 15px; }
+  #page4 .pay-tab-check input[type="checkbox"] { width: 15px; height: 15px; vertical-align: middle; accent-color: #5ab946; }
+  #page4 .pay-tab-check label { font-size: 13px; color: #444; cursor: pointer; }
+  #page4 .input-info-txt { font-size: 12px; color: #999; margin-top: 4px; }
+  #page4 .scw-btn-block { width: 100%; text-align: center; padding: 16px 0; }
+  #page4 .scw-btn-block .btn { display: inline-block; min-width: 160px; height: 44px; line-height: 44px; margin: 0 8px; padding: 0 24px; background: #5ab946; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; border: none; font-family: inherit; transition: 0.2s; text-decoration: none; }
+  #page4 .scw-btn-block .btn:hover { background: #3d8c2e; }
+  #page4 .content-txt-wrap.ctw-center { text-align: center; }
+  #page4 .content-txt-wrap.ctw-bottom { margin-top: 16px; }
+  #page4 .red-tip { display: inline-block; background: white; border: 1px solid #f85766; border-radius: 6px; color: #f85766; padding: 8px 12px; font-size: 12px; line-height: 1.5; }
+  #page4 .payway-box { width: 100%; }
+  #page4 .pay-main-content { padding: 0 16px 20px; }
+  /* Apple Pay / GWPay placeholder */
+  #page4 .altpay-placeholder { padding: 40px 20px; text-align: center; color: #888; font-size: 14px; }
+
+  /* Footer */
+  .ecpay-footer { background: var(--green-dark); color: white; text-align: center; padding: 20px; }
+  .ecpay-footer .footer-logo-txt { font-size: 16px; font-weight: 800; letter-spacing: 2px; margin-bottom: 4px; }
+  .ecpay-footer p { font-size: 11px; opacity: 0.7; line-height: 1.6; }
+  #page4 .mp-tip { text-align: center; font-size: 12px; color: #999; padding: 16px; border-top: 1px solid #e0e0e0; }
+
+  /* Transition overlay */
+  .transition-overlay {
+    position: fixed; inset: 0; background: var(--green); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .transition-overlay.show { opacity: 1; pointer-events: all; }
+  .transition-overlay .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f0f0f0; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="transition-overlay" id="overlay"><div class="spinner"></div></div>
+
+<!-- ===== PAGE 1: QR CODE ===== -->
+<div class="page active" id="page1">
+  <div class="qr-card">
+    <div class="qr-store-icon">🍱</div>
+    <div class="qr-store-name">好吃餐車</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">掃描 QR Code 點餐付款</div>
+    <div class="qr-box" onclick="gotoPage(2)">
+      <canvas id="qrCanvas" width="200" height="200"></canvas>
+    </div>
+    <div class="qr-scan-hint">▲ 點擊 QR Code 模擬掃描</div>
+    <div class="qr-table-badge">5 號桌</div>
+    <div class="tap-hint">👆 點擊 QR Code 進入付款頁面</div>
+  </div>
+</div>
+
+<!-- ===== PAGE 2: 付款頁1 ===== -->
+<div class="page" id="page2">
+  <div class="ecpay-wrap">
+    <div class="ecpay-header">
+      <span class="logo-text">好吃餐車 × ECPay</span>
+      <span class="ecpay-logo-small">ECPay</span>
+    </div>
+    <div class="pay-tab-title">
+      好吃餐車
+      <div class="sub">5號桌 · 請確認訂單金額</div>
+    </div>
+    <div class="p2-content">
+      <div class="form-row">
+        <label class="form-label"><span class="req">*</span>商品明細<span class="en">Product</span></label>
+        <div class="product-display">好吃的早午餐</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="p2Amount"><span class="req">*</span>金額<span class="en">Amount (TWD)</span></label>
+        <input class="form-input" type="number" id="p2Amount" placeholder="請輸入金額" min="2" max="200000" value="">
+      </div>
+      <button class="btn-primary" onclick="gotoPage3()">下一步</button>
+      <div class="notice-box">
+        <h4>注意事項</h4>
+        <ul>
+          <li>結帳金額若<span class="tex_col">超過 200,000 元或小於 2 元</span>，將無法選擇信用卡付款。</li>
+          <li>付款前請確認金額正確，交易送出後不可更改。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mp-tip">金流服務由綠界科技 ECPay 提供</div>
+    <div class="ecpay-footer">
+      <div class="footer-logo-txt">綠界科技 ECPay</div>
+      <p>SSL安全加密金流 | Copyright © 1996-2026 Green World FinTech Service Co., Ltd.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 3: 付款頁2 ===== -->
+<div class="page" id="page3">
+  <div class="ecpay-wrap">
+    <div class="ecpay-header">
+      <span class="logo-text">好吃餐車 × ECPay</span>
+      <span class="ecpay-logo-small">ECPay</span>
+    </div>
+    <div class="pay-tab-title">
+      填寫資料
+      <div class="sub">Receiving information</div>
+    </div>
+
+    <!-- 訂單資訊 -->
+    <div style="padding:16px 20px 4px;">
+      <div class="section-title">訂單資訊 <span class="en">Order Information</span></div>
+      <table class="order-table">
+        <tr>
+          <th>訂單編號 <span style="font-size:11px;color:#aaa">Order No</span></th>
+          <td id="p3OrderNo">2606021604509272</td>
+        </tr>
+        <tr>
+          <th>商店名稱 <span style="font-size:11px;color:#aaa">Store</span></th>
+          <td>好吃餐車商店</td>
+        </tr>
+      </table>
+      <div class="currency-note">單位 Currency：新台幣 (NTD)</div>
+      <table class="amount-table">
+        <thead><tr><th style="text-align:left">商品明細 Product</th><th>總計 Amount</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>好吃的早午餐</td>
+            <td id="p3TotalAmt" style="text-align:right;font-weight:700;">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 付款人資訊 -->
+    <div class="section-block" style="margin-top:8px;">
+      <div class="section-title">付款人資訊 <span class="en">Payer Information</span></div>
+      <div class="form-row">
+        <label class="form-label"><span class="req">*</span>姓名 <span class="en">Name</span></label>
+        <input class="form-input" type="text" id="p3PayerName" placeholder="請輸入姓名">
+      </div>
+      <div class="form-row">
+        <label class="form-label"><span class="req">*</span>手機 <span class="en">Cell phone</span></label>
+        <input class="form-input" type="tel" id="p3PayerPhone" placeholder="請輸入手機號碼" maxlength="20">
+      </div>
+      <div class="form-row">
+        <label class="form-label">電子信箱 <span class="en">Email</span></label>
+        <input class="form-input" type="email" id="p3PayerEmail" placeholder="請輸入電子郵件">
+        <div style="font-size:12px;color:#999;margin-top:4px;">填寫後，如有繳費帳號將寄送至此信箱。</div>
+      </div>
+    </div>
+
+    <!-- 發票/收據開立 -->
+    <div class="section-block">
+      <div class="section-title">🧾 發票/收據開立</div>
+      <div class="invoice-section">
+        <div style="margin-bottom:12px;">
+          <label class="form-label">發票類型</label>
+          <select class="form-input" id="invoiceType" onchange="onInvoiceTypeChange()">
+            <option value="member">綠界會員載具</option>
+            <option value="mobile">手機條碼載具</option>
+            <option value="citizen">自然人憑證</option>
+            <option value="paper">列印紙本發票</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;" class="form-row">
+            <label class="form-label"><span class="req">*</span>手機號碼</label>
+            <input class="form-input" type="tel" id="invoicePhone" placeholder="0912345678">
+          </div>
+          <div style="flex:1;min-width:140px;" class="form-row">
+            <label class="form-label">電子信箱（選填）</label>
+            <input class="form-input" type="email" id="invoiceEmail" placeholder="example@mail.com">
+            <div style="font-size:11px;color:#aaa;margin-top:3px;">中獎通知將發送至此信箱</div>
+          </div>
+        </div>
+        <div class="conditional-field" id="cond-mobile">
+          <label class="form-label"><span class="req">*</span>手機載具編號</label>
+          <input class="form-input" type="text" placeholder="/ABC1234">
+          <div style="font-size:12px;color:#aaa;margin-top:4px;">格式：「/」+ 7 碼（大寫英數字、+、-、.）</div>
+        </div>
+        <div class="conditional-field" id="cond-citizen">
+          <label class="form-label"><span class="req">*</span>自然人憑證載具編號</label>
+          <input class="form-input" type="text" placeholder="TP12345678901234">
+          <div style="font-size:12px;color:#aaa;margin-top:4px;">格式：2 碼大寫英文 + 14 碼數字</div>
+        </div>
+        <div class="conditional-field" id="cond-paper">
+          <div style="font-size:13px;color:#666;padding:4px 0;">列印紙本發票將於交易完成後由店家提供。</div>
+        </div>
+        <div id="donateField" style="margin-top:14px;">
+          <label class="form-label">是否捐贈發票</label>
+          <div class="donate-toggle">
+            <label class="radio-label"><input type="radio" name="donate" value="no" checked> 否</label>
+            <label class="radio-label"><input type="radio" name="donate" value="yes"> 是</label>
+          </div>
+          <div class="conditional-field" id="cond-donate">
+            <label class="form-label"><span class="req">*</span>捐贈碼</label>
+            <input class="form-input" type="text" placeholder="請輸入捐贈碼（3-7碼數字）">
+            <div style="margin-top:6px;padding:8px 12px;background:#f3f4f6;border-radius:4px;font-size:13px;color:#aaa;border-left:3px solid #d1d5db;">
+              輸入捐贈碼後，將自動顯示對應之捐款單位
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 同意條款 -->
+    <div style="padding:12px 20px 0;">
+      <div class="checkbox-row">
+        <input type="checkbox" id="agreeRecord">
+        <label for="agreeRecord">同意綠界科技記錄本次交易資料，以利下次使用。</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="agreePrivacy">
+        <label for="agreePrivacy">我已閱讀並了解<a>【個人資料運用聲明】</a>，並已確認上述資訊無誤。</label>
+      </div>
+    </div>
+
+    <div style="padding:16px 20px;">
+      <button class="back-btn" onclick="gotoPage(2)">← 返回上一步</button>
+      <button class="btn-primary" onclick="gotoPage4()">前往付款</button>
+    </div>
+    <div class="mp-tip">金流服務由綠界科技 ECPay 提供</div>
+    <div class="ecpay-footer">
+      <div class="footer-logo-txt">綠界科技 ECPay</div>
+      <p>SSL安全加密金流 | Copyright © 1996-2026 Green World FinTech Service Co., Ltd.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE 4: AIO (ECPay faithful layout) ===== -->
+<div class="page" id="page4">
+  <div class="site-body">
+
+    <!-- 訂單資訊區塊 -->
+    <div class="site-content-wrapper">
+      <div class="site-content">
+        <div class="order-info-box">
+          <h3 class="oib-title">訂單資訊</h3>
+          <div class="oib-detail">
+            <div class="obd-box ob-01">
+              <dl><dt>訂單編號</dt><dd id="p4OrderNo">2606021612129288</dd></dl>
+              <dl><dt>商店名稱</dt><dd>好吃餐車商店</dd></dl>
+            </div>
+            <div class="obd-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="otb-l">商品明細</th>
+                    <th class="otb-r">小計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>好吃的早午餐</td>
+                    <td class="otb-r" id="p4SubTotal">100</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="oib-sum">
+            <dd class="obs-title">實際付款金額</dd>
+            <dd class="obs-price" id="p4TotalAmt">NT$100</dd>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 付款方式區塊 -->
+    <div class="site-content-wrapper scw-gray">
+      <div class="site-content">
+        <div class="member-pay">
+          <h3 class="content-title">付款方式</h3>
+          <div class="pay-tab-wrapper ptw-no-op">
+            <div class="pay-tab-menu">
+              <ul class="pay-tab-list">
+                <li id="liCredit" class="active" onclick="aioSwitchTab('pay-tab0', this)">
+                  <div class="ptl-ic" style="background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23666%22><rect x=%222%22 y=%224%22 width=%2220%22 height=%2216%22 rx=%222%22/><rect x=%222%22 y=%228%22 width=%2220%22 height=%224%22 fill=%22white%22/></svg>');"></div>
+                  信用卡
+                </li>
+                <li id="liApplePay" onclick="aioSwitchTab('pay-tab8', this)">
+                  <div class="ptl-ic" style="font-size:16px;background:none;"> </div>
+                  Apple Pay
+                </li>
+                <li id="liGWPay" onclick="aioSwitchTab('pay-tab11', this)">
+                  <div class="ptl-ic" style="background:none;font-size:14px;">💚</div>
+                  綠界Pay
+                </li>
+              </ul>
+            </div>
+
+            <div class="pay-tab-content">
+
+              <!-- 信用卡 tab -->
+              <div class="pay-tab0 show">
+                <div class="payway-box">
+                  <div class="pay-main-content">
+                    <div class="pay-tab-form">
+                      <h4 class="scw-focus">※ 信用卡交易資訊</h4>
+                      <div class="ptf-card-type">
+                        <span class="cc-icon">VISA</span>
+                        <span class="cc-icon">MC</span>
+                        <span class="cc-icon">JCB</span>
+                        <span class="cc-icon">UP</span>
+                      </div>
+
+                      <dl class="ptf-bs">
+                        <dt>信用卡類型<sup class="inp-required">*</sup></dt>
+                        <dd>
+                          <label class="pay-tab-select">
+                            <select id="CreditPayType">
+                              <option value="Visa/Master/JCB">VISA / MasterCard / JCB</option>
+                              <option value="UnionPay">銀聯卡</option>
+                            </select>
+                          </label>
+                        </dd>
+                      </dl>
+
+                      <dl>
+                        <dt><label><span>信用卡卡號</span> <sup class="inp-required">*</sup></label></dt>
+                        <dd>
+                          <ul class="pay-card-num">
+                            <li class="card-num">
+                              <input id="CCpart1" type="tel" maxlength="4" placeholder="0000" autocomplete="off" pattern="\d*"> -
+                              <input id="CCpart2" type="tel" maxlength="4" placeholder="0000" autocomplete="off" pattern="\d*"> -
+                              <input id="CCpart3" type="tel" maxlength="4" placeholder="0000" autocomplete="off" pattern="\d*"> -
+                              <input id="CCpart4" type="tel" maxlength="4" placeholder="0000" autocomplete="off" pattern="\d*">
+                            </li>
+                          </ul>
+                        </dd>
+                      </dl>
+
+                      <dl class="pay-card-date">
+                        <dt>卡片有效期限<sup class="inp-required">*</sup></dt>
+                        <dd>
+                          <div>
+                            <input type="tel" id="creditMM" placeholder="MM" maxlength="2" pattern="\d*">
+                            <span style="color:#aaa;">/</span>
+                            <input type="tel" id="creditYY" placeholder="YY" maxlength="2" pattern="\d*">
+                          </div>
+                        </dd>
+                      </dl>
+
+                      <div class="pay-card-ccvb">
+                        <dl>
+                          <dt>信用卡安全碼<sup class="inp-required">*</sup></dt>
+                          <dd>
+                            <input id="CreditBackThree" type="tel" maxlength="3" placeholder="CVV" pattern="\d*">
+                            <span style="font-size:12px;color:#aaa;">卡片背面後三碼</span>
+                          </dd>
+                        </dl>
+                      </div>
+
+                      <div class="pay-tab-check">
+                        <h4 class="scw-focus">※ 持卡人資料</h4>
+                        <input type="checkbox" id="card_rem" checked="checked">
+                        <label for="card_rem" class="checkbox" style="font-size:13px;">記住本次付款人資訊</label>
+                      </div>
+
+                      <dl>
+                        <dt><label for="CCHolderTemp">持卡人姓名 <sup class="inp-required">*</sup></label></dt>
+                        <dd>
+                          <input id="CCHolderTemp" type="text" placeholder="WANG XIAO MING">
+                          <div class="input-info-txt">請輸入卡片上的英文姓名</div>
+                        </dd>
+                      </dl>
+
+                      <dl class="ptf-dfe-phone">
+                        <dt><label for="CellPhoneCheck">手機號碼 <sup class="inp-required">*</sup></label></dt>
+                        <dd>
+                          <input id="CellPhoneCheck" type="tel" placeholder="0987654321">
+                          <div class="input-info-txt">請輸入於發卡銀行留存的手機</div>
+                        </dd>
+                      </dl>
+
+                      <dl class="ptf-email">
+                        <dt><label for="EmailTemp">電子信箱</label></dt>
+                        <dd>
+                          <input type="text" id="EmailTemp" placeholder="ecpay@ecpay.com.tw">
+                        </dd>
+                      </dl>
+
+                      <div class="scw-btn-block">
+                        <a id="CreditPaySubmit" class="btn" onclick="showPaySuccess()" style="margin-bottom:20px;cursor:pointer;">立即付款</a>
+                      </div>
+                      <div class="content-txt-wrap ctw-center ctw-bottom">
+                        <p class="red-tip">綠界科技不承作投資、賭博、虛擬貨幣等交易代理收付，勿聽從他人指示付款，有疑慮請撥打 165 或 110</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Apple Pay tab -->
+              <div class="pay-tab8">
+                <div class="altpay-placeholder">
+                  <div style="font-size:13px;color:#444;font-weight:bold;margin-bottom:16px;"> Apple Pay</div>
+                  <div style="display:inline-block;border:3px solid #000;border-radius:8px;padding:12px;background:#fff;">
+                    <canvas id="qrApplePay" width="160" height="160"></canvas>
+                  </div>
+                  <p style="margin-top:14px;font-size:13px;color:#555;">請使用支援 Apple Pay 的裝置掃描 QR Code 完成付款</p>
+                  <p style="margin-top:6px;font-size:12px;color:#aaa;">此為示意 QR Code，實際交易請依頁面指示操作</p>
+                </div>
+              </div>
+
+              <!-- 綠界Pay tab -->
+              <div class="pay-tab11">
+                <div class="altpay-placeholder">
+                  <div style="font-size:13px;color:#444;font-weight:bold;margin-bottom:16px;">💚 綠界Pay 掃碼付款</div>
+                  <div style="display:inline-block;border:3px solid #5ab946;border-radius:8px;padding:12px;background:#fff;">
+                    <canvas id="qrGWPay" width="160" height="160"></canvas>
+                  </div>
+                  <p style="margin-top:14px;font-size:13px;color:#555;">請開啟綠界 App 掃描 QR Code 完成付款</p>
+                  <p style="margin-top:6px;font-size:12px;color:#aaa;">此為示意 QR Code，實際交易請依頁面指示操作</p>
+                </div>
+              </div>
+
+            </div><!-- /pay-tab-content -->
+          </div><!-- /pay-tab-wrapper -->
+        </div><!-- /member-pay -->
+      </div><!-- /site-content -->
+    </div><!-- /scw-gray -->
+
+    <div class="mp-tip" style="background:white;">
+      <button class="back-btn" onclick="gotoPage(3)" style="margin-bottom:8px;display:block;">← 返回修改資料</button>
+      金流服務由綠界科技 ECPay 提供
+    </div>
+    <div class="ecpay-footer">
+      <div class="footer-logo-txt">綠界科技 ECPay</div>
+      <p>SSL安全加密金流 | Copyright © 1996-2026 Green World FinTech Service Co., Ltd.</p>
+    </div>
+
+  </div><!-- /site-body -->
+</div><!-- /page4 -->
+
+<script>
+// ===== QR Code (visual) =====
+function drawQR() {
+  const canvas = document.getElementById('qrCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 200, modules = 25, cellSize = size / modules;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+  const seed = "好吃餐車5號桌";
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < modules; y++) {
+    for (let x = 0; x < modules; x++) {
+      const inFinder = (x < 8 && y < 8) || (x >= modules-8 && y < 8) || (x < 8 && y >= modules-8);
+      let dark = false;
+      if (inFinder) {
+        if (x >= modules-8 && y >= modules-8) { dark = false; }
+        else {
+          const fx = x < 8 ? x : x-(modules-8), fy = y < 8 ? y : y-(modules-8);
+          dark = ((fx===0||fx===6||fy===0||fy===6) && fx<=6 && fy<=6) || (fx>=2&&fx<=4&&fy>=2&&fy<=4);
+        }
+      } else {
+        dark = ((hash ^ (x*31+y*17+x*y)) & 1) === 1;
+      }
+      if (dark) ctx.fillRect(x*cellSize, y*cellSize, cellSize-0.5, cellSize-0.5);
+    }
+  }
+  function drawFinder(ox, oy) {
+    ctx.fillStyle='#000'; ctx.fillRect(ox*cellSize, oy*cellSize, 7*cellSize, 7*cellSize);
+    ctx.fillStyle='#fff'; ctx.fillRect((ox+1)*cellSize,(oy+1)*cellSize, 5*cellSize, 5*cellSize);
+    ctx.fillStyle='#000'; ctx.fillRect((ox+2)*cellSize,(oy+2)*cellSize, 3*cellSize, 3*cellSize);
+  }
+  drawFinder(0,0); drawFinder(modules-7,0); drawFinder(0,modules-7);
+}
+drawQR();
+
+// Draw placeholder QRs for Apple Pay and GWPay (drawn lazily on first tab switch)
+function drawSmallQR(canvasId, seed, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || canvas.dataset.drawn) return;
+  canvas.dataset.drawn = '1';
+  const ctx = canvas.getContext('2d');
+  const size = 160, modules = 21, cellSize = size / modules;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  for (let y = 0; y < modules; y++) {
+    for (let x = 0; x < modules; x++) {
+      const inFinder = (x < 7 && y < 7) || (x >= modules-7 && y < 7) || (x < 7 && y >= modules-7);
+      let dark = false;
+      if (inFinder) {
+        if (x >= modules-7 && y >= modules-7) { dark = false; }
+        else {
+          const fx = x < 7 ? x : x-(modules-7), fy = y < 7 ? y : y-(modules-7);
+          dark = ((fx===0||fx===6||fy===0||fy===6) && fx<=6 && fy<=6) || (fx>=2&&fx<=4&&fy>=2&&fy<=4);
+        }
+      } else {
+        dark = ((hash ^ (x*31+y*17+x*y*3)) & 1) === 1;
+      }
+      if (dark) {
+        ctx.fillStyle = color || '#000';
+        ctx.fillRect(x*cellSize+0.5, y*cellSize+0.5, cellSize-1, cellSize-1);
+      }
+    }
+  }
+  function drawFinder(ox, oy) {
+    ctx.fillStyle = color || '#000';
+    ctx.fillRect(ox*cellSize, oy*cellSize, 7*cellSize, 7*cellSize);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect((ox+1)*cellSize,(oy+1)*cellSize, 5*cellSize, 5*cellSize);
+    ctx.fillStyle = color || '#000';
+    ctx.fillRect((ox+2)*cellSize,(oy+2)*cellSize, 3*cellSize, 3*cellSize);
+  }
+  drawFinder(0,0); drawFinder(modules-7,0); drawFinder(0,modules-7);
+}
+
+// ===== Navigation =====
+let inputAmount = 0;
+
+function gotoPage(n) {
+  transition(() => {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page'+n).classList.add('active');
+    window.scrollTo(0,0);
+  });
+}
+
+function gotoPage3() {
+  const amtInput = document.getElementById('p2Amount');
+  const amt = parseInt(amtInput.value);
+  if (!amt || amt < 2 || amt > 200000) {
+    amtInput.focus();
+    amtInput.style.borderColor = '#d32f2f';
+    amtInput.style.boxShadow = '0 0 0 3px rgba(211,47,47,0.12)';
+    setTimeout(() => { amtInput.style.borderColor=''; amtInput.style.boxShadow=''; }, 2000);
+    return;
+  }
+  inputAmount = amt;
+  document.getElementById('p3TotalAmt').textContent = amt.toLocaleString() + ' 元';
+  document.getElementById('p3OrderNo').textContent = genOrderNo();
+  gotoPage(3);
+}
+
+function gotoPage4() {
+  document.getElementById('p4SubTotal').textContent = inputAmount.toLocaleString();
+  document.getElementById('p4TotalAmt').textContent = 'NT$' + inputAmount.toLocaleString();
+  document.getElementById('p4OrderNo').textContent = genOrderNo();
+  gotoPage(4);
+}
+
+function genOrderNo() {
+  const d = new Date();
+  return [d.getFullYear()%100, d.getMonth()+1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map(n=>String(n).padStart(2,'0')).join('') + String(Math.floor(Math.random()*10000)).padStart(4,'0');
+}
+
+function transition(fn) {
+  const overlay = document.getElementById('overlay');
+  overlay.classList.add('show');
+  setTimeout(() => { fn(); setTimeout(() => overlay.classList.remove('show'), 200); }, 350);
+}
+
+// ===== Page 3 =====
+function onInvoiceTypeChange() {
+  const t = document.getElementById('invoiceType').value;
+  document.getElementById('cond-mobile').classList.toggle('show', t==='mobile');
+  document.getElementById('cond-citizen').classList.toggle('show', t==='citizen');
+  document.getElementById('cond-paper').classList.toggle('show', t==='paper');
+  document.getElementById('donateField').style.display = t==='paper' ? 'none' : '';
+  if (t==='paper') document.getElementById('cond-donate').classList.remove('show');
+}
+
+document.querySelectorAll('input[name="donate"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.getElementById('cond-donate').classList.toggle('show', r.value==='yes' && r.checked);
+  });
+});
+
+const districtMap = {
+  '台北市':['中正區','大安區','信義區','松山區','內湖區','文山區','中山區','士林區','北投區','南港區','萬華區','大同區'],
+  '新北市':['板橋區','三重區','中和區','永和區','新莊區','新店區','土城區','蘆洲區'],
+  '桃園市':['桃園區','中壢區','平鎮區','八德區','龜山區'],
+  '台中市':['北屯區','西屯區','南屯區','北區','西區','南區','東區','中區'],
+  '台南市':['東區','南區','北區','中西區','安平區','安南區'],
+  '高雄市':['鼓山區','左營區','楠梓區','三民區','苓雅區','前金區','新興區','前鎮區','旗津區','小港區']
+};
+function onCityChange() {
+  const city = document.getElementById('p3City').value;
+  document.getElementById('p3District').innerHTML = '<option value="">鄉鎮市區</option>' +
+    (districtMap[city]||[]).map(d=>`<option>${d}</option>`).join('');
+}
+
+// ===== Page 4 AIO tab switch =====
+function aioSwitchTab(tabId, el) {
+  document.querySelectorAll('#page4 .pay-tab-list li').forEach(li => li.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#page4 .pay-tab0, #page4 .pay-tab8, #page4 .pay-tab11').forEach(t => t.classList.remove('show'));
+  document.querySelector('#page4 .' + tabId).classList.add('show');
+  if (tabId === 'pay-tab8') drawSmallQR('qrApplePay', 'ApplePay好吃餐車' + inputAmount, '#000');
+  if (tabId === 'pay-tab11') drawSmallQR('qrGWPay', 'GWPay好吃餐車' + inputAmount, '#2d8a28');
+}
+
+// ===== Pay success =====
+function showPaySuccess() {
+  transition(() => {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const p4 = document.getElementById('page4');
+    p4.classList.add('active');
+    p4.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:white;">
+        <div style="text-align:center;padding:40px 30px;max-width:400px;">
+          <div style="width:80px;height:80px;background:#5ab946;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:40px;color:white;font-weight:bold;">✓</div>
+          <h2 style="font-size:24px;font-weight:800;color:#3d8c2e;margin-bottom:8px;">付款成功！</h2>
+          <p style="color:#666;margin-bottom:4px;">好吃餐車商店</p>
+          <p style="font-size:28px;font-weight:800;color:#333;margin:12px 0;">NT$${inputAmount.toLocaleString()}</p>
+          <p style="color:#aaa;font-size:13px;margin-bottom:32px;">5 號桌・好吃的早午餐</p>
+          <button onclick="location.reload()" style="width:100%;max-width:240px;padding:14px;background:#5ab946;color:white;border:none;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">返回首頁</button>
+        </div>
+      </div>`;
+    window.scrollTo(0,0);
+  });
+}
+</script>
+</body>
+</html>
